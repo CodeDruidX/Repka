@@ -1,6 +1,2 @@
-#SocksPort 0
 HiddenServiceDir keys
 HiddenServicePort 80 127.0.0.1:8765
-
-#UseBridges 0
-#ClientTransportPlugin obfs4 exec PluggableTransports/lyrebird.exe
