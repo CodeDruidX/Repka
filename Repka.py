@@ -148,6 +148,7 @@ def pub2name(pub):
 	return onion_address_from_public_key(pub)
 
 def verif_frame(sig,data):
+	print(data)
 	pub,dat=data[:32],data[32:]
 	vk=VerifyKey(pub)
 	try:
@@ -162,69 +163,71 @@ def sign(data):
 def make_frame(data):
 	return base64.b32encode(sign(k.verify_key.encode()+data)),k.verify_key.encode()+data
 
-import socks
 import re
+from requests_tor import RequestsTor
+rt = RequestsTor(tor_ports=(9050,))
 
 def catalouge(url):
 	files=[]
 	while not files:
-		s = socks.socksocket()
-		s.set_proxy(socks.SOCKS5, "localhost",9050)
-		s.connect((url, 80))
-		s.sendall(b"GET / HTTP/1.0\r\n\r\n")
-		res=s.recv(4096)
-		files=re.findall(b"<li><a.*?>(.*?)<\/a><\/li>",res)
+		res=rt.get("http://"+url).text
+		files=re.findall("<li><a.*?>(.*?)<\/a><\/li>",res)
 	return files
 def unknown(c):
-	return set([i.decode() for i in c])-set(os.listdir("database"))
+	return set([i for i in c])-set(os.listdir("database"))
 
-def req(url,file=""):
-	s = socks.socksocket()
-	s.set_proxy(socks.SOCKS5, "localhost",9050)
-	s.connect((url, 80))
-	s.sendall(b"GET /"+file.encode()+b" HTTP/1.0\r\n\r\n")
-	res=s.recv(4096)
-	if not file: return res
-	l=int(res.split(b"Content-Length: ",1)[1].split(b"\r",1)[0].decode())
-	return s.recv(l)
+#def req(url,file=""):
+#	s = socks.socksocket()
+#	s.set_proxy(socks.SOCKS5, "localhost",9050)
+#	s.connect((url, 80))
+#	s.sendall(b"GET /"+file.encode()+b" HTTP/1.0\r\n\r\n")
+#	res=s.recv(4096)
+#	if not file: return res
+#	l=int(res.split(b"Content-Length: ",1)[1].split(b"\r",1)[0].decode())
+#	return s.recv(l)
 
-def getfile(url,file=""):
-	r=req(url,file)
-	#print(r)
-	s,d=base64.b32decode(file.split(".html",1)[0]),r
-	print([s,d])
-	return verif_frame(s,d)
+#def getfile(url,file=""):
+#	r=req(url,file)
+#	#print(r)
+#	s,d=base64.b32decode(file.split(".html",1)[0]),r
+#	print([s,d])
+#	return verif_frame(s,d)
 
-def copy(url,file=""):
-	r=req(url,file)
-	s,d=base64.b32decode(file.split(".html",1)[0]),r
+def copy(url,file):
+	r=rt.get("http://"+url+"/"+file).text
+	s,d=base64.b32decode(file.split(".html",1)[0]),r.encode()
+	#print([s,d])
 	_,_=verif_frame(s,d)
-	print(file)
+	assert _
+	#print(file)
 	if _: open(f"database/{file}","wb").write(d)
 
 def sync():
 	urls=set()
 	for i in os.listdir("database"):
 		urls.update({pub2name(open(f"database/{i}","rb").read()[:32])})
-	print("Sync with",len(urls),"nodes")
+	print("🌐 Sync with",len(urls),"nodes")
 	for url in list(urls):
 		print("Sync with",url)
 		try:
 			c=catalouge(url)
-		except:
-			print("Malformed domain",url)
+		except Exception as e:
+			print("⛔ Malformed or fake domain",url,e)
 			continue
 		u=list(unknown(c))
 		for i in u:
 			try:
 				copy(url,i)
-				print("Loaded",i)
-			except: print("Malformed",i)
+				print("✅ Loaded",i)
+			except Exception as e: print("🔇 Malformed",i,e)
 
 def cycle():
 	import subprocess as s
 	s.Popen(["tor","-f","torrc"])
 	s.Popen(["python","-m","http.server","8765","-d","database"])
+	for i in range(10,-1,-1):
+		print(i,"... Repka is starting")
+		time.sleep(1)
 	while 1:
 		sync()
 		time.sleep(1)
@@ -235,7 +238,5 @@ def add(data):
 	open(f"database/{name.decode()}.html","wb").write(dat)
 
 if __name__=="__main__":
-	add(b"<br><br><h1>I am alive!</h1>")
+	add("<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"><br><br><h1>I am alive!</h1>This is my simple Repka card.<br>If you see it in your database, probably you will sync with me in some time ❤️".encode())
 	cycle()
-
-	
