@@ -1,3 +1,49 @@
+class _Getch:
+    """Gets a single character from standard input.  Does not echo to the
+screen."""
+    def __init__(self):
+        try:
+            self.impl = _GetchWindows()
+        except ImportError:
+            self.impl = _GetchUnix()
+
+    def __call__(self): return self.impl()
+
+
+class _GetchUnix:
+    def __init__(self):
+        import tty, sys
+
+    def __call__(self):
+        import sys, tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(sys.stdin.fileno())
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch.encode()
+
+
+class _GetchWindows:
+    def __init__(self):
+        import msvcrt
+
+    def __call__(self):
+        import msvcrt
+        return msvcrt.getch()
+
+
+getch = _Getch()
+
+
+
+
+
+
+
+
 import base64
 import hashlib
 import os
@@ -6,23 +52,7 @@ import time
 
 sd="keys"
 
-base=['!', '#', '$', '%', '&', '(', ')', '*', '+', '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ';', '<', '=', '>', '?', '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~']
-
-ultra=['а', 'б', 'в', 'г', 'д', 'е', 'ж', 'з', 'и', 'й', 'к', 'л', 'м', 'н', 'о', 'п', 'с', 'т', 'у', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', 'ъ', 'ы', 'ь', 'э', 'ю', 'я', 'ё', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z','A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',"-"]
-
-a='─━│┃┄┅┆┇┈┉┊┋┌┍┎┏┐┑┒┓└┕┖┗┘┙┚┛├┝┞┟┠┡┢┣┤┥┦┧┨┩┪┫┬┭┮┯┰┱┲┳┴┵┶┷┸┹┺┻┼┽┾┿╀╁╂╃╄╅╆╇╈╉╊╋╌╍╎╏═║╪╫╬'
-ultra=list(a)
-def base2ultra(s):
-	n=""
-	for i in s:
-		n+=ultra[base.index(i)]
-	return n
-def ultra2base(s):
-	n=""
-	for i in s:
-		n+=base[ultra.index(i)]
-	return n
-
+http_local_port=8765
 
 def expand_private_key(secret_key) -> bytes:
     hash = hashlib.sha512(secret_key[:32]).digest()
@@ -129,7 +159,18 @@ import random
 import os
 import time
 
-random.seed(input(">"))
+#random.seed(input("User seed (your very-very private combination of words, which nobody can reproduce)>"))
+print("User seed (your very-very private combination of words, which nobody can reproduce)")
+b=""
+tip=["❤️","🩷","🧡","💛","💚","💙","🩵","💜","🤎","🖤","🩶","🤍"]
+while 1:
+	n=getch()
+	if n==b"\n" or n==b"\r":break
+	b+=n.decode()
+	random.seed(b)
+	print("Tip: ","".join(random.sample(tip,5)),end="\r")
+print("OK, lets go")
+random.seed(b)
 k=SigningKey(random.randbytes(32))
 
 
@@ -142,30 +183,39 @@ create_hidden_service_files(
         k._signing_key[:-32],  # the ed25519 private key often includes the public key, this does not
         k.verify_key._key,
     )
-
-
+addr=onion_address_from_public_key(k.verify_key.encode())
+print(addr)
 def pub2name(pub):
 	return onion_address_from_public_key(pub)
 
 def verif_frame(sig,data):
-	print(data)
-	pub,dat=data[:32],data[32:]
+	#print(data)
+	pub=base64.b85decode(data[:40])
 	vk=VerifyKey(pub)
+	#print([sig,data])
 	try:
-		ver=vk.verify(data,sig)
-	except:
+		ver=vk.verify(data.encode(),sig)
+	except Exception as e:
+		print("Sign dоesnt match",e)
 		return None,None
 	return pub2name(ver[:32]),ver[32:]
 
 def sign(data):
 	return k.sign(data)[:64]
 
-def make_frame(data):
-	return base64.b32encode(sign(k.verify_key.encode()+data)),k.verify_key.encode()+data
+def make_frame(data:str) -> str:
+	bkey=base64.b85encode(k.verify_key.encode()).decode()
+	return base64.b32encode(sign(bkey.encode()+data.encode())),bkey+data
 
 import re
+import requests
 from requests_tor import RequestsTor
 rt = RequestsTor(tor_ports=(9050,))
+
+def req(pth):
+	r=rt.get(pth)
+	r.encoding="utf-8"
+	return r.text
 
 def catalouge(url):
 	files=[]
@@ -194,37 +244,45 @@ def unknown(c):
 #	return verif_frame(s,d)
 
 def copy(url,file):
-	r=rt.get("http://"+url+"/"+file).text
-	s,d=base64.b32decode(file.split(".html",1)[0]),r.encode()
-	#print([s,d])
-	_,_=verif_frame(s,d)
+	print("http://"+url+"/"+file)
+	r=req("http://"+url+"/"+file)
+	s=base64.b32decode(file.split(".html",1)[0])
+	_,_=verif_frame(s,r)
 	assert _
 	#print(file)
-	if _: open(f"database/{file}","wb").write(d)
+	if _: open(f"database/{file}","w",encoding="utf8").write(r)
 
 def sync():
 	urls=set()
 	for i in os.listdir("database"):
-		urls.update({pub2name(open(f"database/{i}","rb").read()[:32])})
-	print("🌐 Sync with",len(urls),"nodes")
-	for url in list(urls):
-		print("Sync with",url)
+		urls.update({pub2name(base64.b85decode(open(f"database/{i}","r",encoding="utf-8").read()[:40]))})
+	urls=urls-{addr}
+	print("🌐 Repka sync",len(urls),"nodes","| Clearnet:",f"http://127.0.0.1:{http_local_port}","| Tor: http://"+addr)
+	l=list(urls)
+	random.shuffle(l)
+	for url in l:
+		print("❇️ Syncing with",url)
 		try:
 			c=catalouge(url)
 		except Exception as e:
-			print("⛔ Malformed or fake domain",url,e)
+			print("🔇 Malformed or fake domain",url,e)
 			continue
 		u=list(unknown(c))
+		random.shuffle(u)
+		changed=False
 		for i in u:
+			if not (".html" in i): continue
 			try:
 				copy(url,i)
 				print("✅ Loaded",i)
-			except Exception as e: print("🔇 Malformed",i,e)
+				changed=True
+			except Exception as e: print("📛 Malformed",i,e)
+		if not changed: print("✴️ All data is up-to-date")
 
 def cycle():
 	import subprocess as s
 	s.Popen(["tor","-f","torrc"])
-	s.Popen(["python","-m","http.server","8765","-d","database"])
+	s.Popen(["python","-m","http.server",str(http_local_port),"-d","database"])
 	for i in range(10,-1,-1):
 		print(i,"... Repka is starting")
 		time.sleep(1)
@@ -235,8 +293,8 @@ def cycle():
 def add(data):
 	name,dat=make_frame(data)
 	#print([name,dat])
-	open(f"database/{name.decode()}.html","wb").write(dat)
+	open(f"database/{name.decode()}.html","w",encoding="utf-8").write(dat)
 
 if __name__=="__main__":
-	add("<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"><br><br><h1>I am alive!</h1>This is my simple Repka card.<br>If you see it in your database, probably you will sync with me in some time ❤️".encode())
+	add(f"<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"><br><br><h1>I am alive!</h1>My name is {addr}<br>This is my simple Repka card.<br>If you see it in your database, probably you will sync with me in some time ❤️")
 	cycle()
