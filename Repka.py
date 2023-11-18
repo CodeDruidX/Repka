@@ -158,6 +158,7 @@ from nacl.signing import SigningKey,VerifyKey
 import random
 import os
 import time
+import requests
 
 #random.seed(input("User seed (your very-very private combination of words, which nobody can reproduce)>"))
 print("User seed (your very-very private combination of words, which nobody can reproduce)")
@@ -242,6 +243,10 @@ def sync():
 		try:
 			urls.update({pub2name(base64.b85decode(open(f"database/{i}","r",encoding="utf-8").read()[:40]))})
 		except:pass
+	for i in os.listdir("InputArticle"):
+		if not (".html" in i): continue
+		if input("Your new Article detected. Type DEPLOY to sign and publish:")=="DEPLOY":
+			add(open(f"InputArticle/{i}","r",encoding="utf8").read())
 	urls=urls-{addr}
 	print("🌐 Repka sync",len(urls),"nodes","| Clearnet:",f"http://127.0.0.1:{http_local_port}","| Tor: http://"+addr)
 	l=list(urls)
@@ -282,7 +287,7 @@ def add(data):
 	open(f"database/{name.decode()}.html","w",encoding="utf-8").write(dat)
 
 if __name__=="__main__":
-	add(f"<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"><body class=\"dark-theme\"><link rel=\"stylesheet\" href=\"themes.css\"><br><h1>👋Hello my friend!</h1>My name is <b>{addr}</b><br>This is my simple <a href=\"uzegCeE5+nlhGCH+8Mv4bO2FGdnEZwHKKhVI1SURrkDuAXLJ5u3ftKwnRtAXL7S1KBFznOYXxt4+nZCjbUzbCg--.html\">Repka card</a>.<br>If you see it in your database, probably you will sync with me in some time ❤️</body>")
+	add(f"<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"><body class=\"dark-theme\"><link rel=\"stylesheet\" href=\"themes.css\"><br><h1>👋Hello my friend!</h1>My name is <b>{addr}</b><br>This is my simple <a href=\"uzegCeE5+nlhGCH+8Mv4bO2FGdnEZwHKKhVI1SURrkDuAXLJ5u3ftKwnRtAXL7S1KBFznOYXxt4+nZCjbUzbCg--.html\">Repka card</a>.<br>If you can see it in your database, probably you will sync with me in some time ❤️</body>")
 	cycle()
 
 	
