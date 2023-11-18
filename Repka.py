@@ -162,14 +162,14 @@ import time
 #random.seed(input("User seed (your very-very private combination of words, which nobody can reproduce)>"))
 print("User seed (your very-very private combination of words, which nobody can reproduce)")
 b=""
-tip=["❤️","🩷","🧡","💛","💚","💙","🩵","💜","🤎","🖤","🩶","🤍"]
+tip=["❤️","🧡","💛","💚","💙","💜","🤎","🖤","🤍"]
 while 1:
 	n=getch()
 	if n==b"\n" or n==b"\r":break
 	b+=n.decode()
 	random.seed(b)
-	print("Tip: ","".join(random.sample(tip,5)),end="\r")
-print("OK, lets go")
+	print("TYPO TIP: ","".join(random.sample(tip,3)),end="\r")
+print("OK, lets go          ")
 random.seed(b)
 k=SigningKey(random.randbytes(32))
 
@@ -205,7 +205,7 @@ def sign(data):
 
 def make_frame(data:str) -> str:
 	bkey=base64.b85encode(k.verify_key.encode()).decode()
-	return base64.b32encode(sign(bkey.encode()+data.encode())),bkey+data
+	return base64.b64encode(sign(bkey.encode()+data.encode())).replace(b"/",b"_").replace(b"=",b"-").replace(b"+",b"."),bkey+data
 
 import re
 import requests
@@ -226,27 +226,11 @@ def catalouge(url):
 def unknown(c):
 	return set([i for i in c])-set(os.listdir("database"))
 
-#def req(url,file=""):
-#	s = socks.socksocket()
-#	s.set_proxy(socks.SOCKS5, "localhost",9050)
-#	s.connect((url, 80))
-#	s.sendall(b"GET /"+file.encode()+b" HTTP/1.0\r\n\r\n")
-#	res=s.recv(4096)
-#	if not file: return res
-#	l=int(res.split(b"Content-Length: ",1)[1].split(b"\r",1)[0].decode())
-#	return s.recv(l)
-
-#def getfile(url,file=""):
-#	r=req(url,file)
-#	#print(r)
-#	s,d=base64.b32decode(file.split(".html",1)[0]),r
-#	print([s,d])
-#	return verif_frame(s,d)
 
 def copy(url,file):
 	print("http://"+url+"/"+file)
 	r=req("http://"+url+"/"+file)
-	s=base64.b32decode(file.split(".html",1)[0])
+	s=base64.b64decode(file.split(".html",1)[0].replace("_","/").replace("-","=").replace(".","+"))
 	_,_=verif_frame(s,r)
 	assert _
 	#print(file)
@@ -255,7 +239,9 @@ def copy(url,file):
 def sync():
 	urls=set()
 	for i in os.listdir("database"):
-		urls.update({pub2name(base64.b85decode(open(f"database/{i}","r",encoding="utf-8").read()[:40]))})
+		try:
+			urls.update({pub2name(base64.b85decode(open(f"database/{i}","r",encoding="utf-8").read()[:40]))})
+		except:pass
 	urls=urls-{addr}
 	print("🌐 Repka sync",len(urls),"nodes","| Clearnet:",f"http://127.0.0.1:{http_local_port}","| Tor: http://"+addr)
 	l=list(urls)
@@ -292,9 +278,11 @@ def cycle():
 
 def add(data):
 	name,dat=make_frame(data)
-	#print([name,dat])
+	print([name,dat])
 	open(f"database/{name.decode()}.html","w",encoding="utf-8").write(dat)
 
 if __name__=="__main__":
-	add(f"<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"><br><br><h1>I am alive!</h1>My name is {addr}<br>This is my simple Repka card.<br>If you see it in your database, probably you will sync with me in some time ❤️")
+	add(f"<meta http-equiv=\"Content-Type\" content=\"text/html;charset=utf-8\"><body class=\"dark-theme\"><link rel=\"stylesheet\" href=\"themes.css\"><br><h1>👋Hello my friend!</h1>My name is <b>{addr}</b><br>This is my simple <a href=\"uzegCeE5+nlhGCH+8Mv4bO2FGdnEZwHKKhVI1SURrkDuAXLJ5u3ftKwnRtAXL7S1KBFznOYXxt4+nZCjbUzbCg--.html\">Repka card</a>.<br>If you see it in your database, probably you will sync with me in some time ❤️</body>")
 	cycle()
+
+	
